@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>图书馆并发管理系统</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>📚 图书馆并发管理系统 (OS Course Design)</h1>
+    
+    <div class="container">
+        <!-- 并发控制演示区 -->
+        <div class="card">
+            <h2>⚙️ 并发借书模拟 (读者-写者问题)</h2>
+            <p>模拟多个读者同时借阅同一本热门书籍，观察互斥锁的保护效果。</p>
+            <button onclick="simulateConcurrentBorrow()">开始并发借书测试</button>
+            <div id="concurrent-result" class="result-box">等待测试...</div>
+        </div>
+
+        <!-- 读者管理区 -->
+        <div class="card">
+            <h2>👤 读者管理</h2>
+            <input type="text" id="reader-name" placeholder="姓名">
+            <input type="text" id="reader-id" placeholder="学号">
+            <button onclick="addReader()">办理注册</button>
+            <ul id="reader-list"></ul>
+        </div>
+
+        <!-- 图书管理区 -->
+        <div class="card">
+            <h2>📖 图书管理</h2>
+            <input type="text" id="book-name" placeholder="书名">
+            <input type="text" id="book-id" placeholder="编号">
+            <button onclick="addBook()">录入新书</button>
+            <button onclick="deleteBook()">撤销图书</button>
+            <ul id="book-list"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
