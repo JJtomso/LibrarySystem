@@ -7,21 +7,18 @@
 </head>
 <body>
     <header id="app-header"></header>
-
     <div class="container">
         <h2>📖 馆藏图书</h2>
         <div id="login-info" style="margin-bottom:10px;"></div>
         <table border="1" id="book-table">
             <thead>
-                <tr>
-                    <th>编号</th><th>书名</th><th>作者</th><th>出版社</th>
+                <tr><th>编号</th><th>书名</th><th>作者</th><th>出版社</th>
                     <th>单价</th><th>存放地点</th><th>状态</th><th>操作</th>
                 </tr>
             </thead>
             <tbody id="book-tbody"></tbody>
         </table>
     </div>
-
     <script src="script.js"></script>
     <script src="header.js"></script>
     <script>
@@ -40,7 +37,7 @@
                         <td>${b.price.toFixed(2)}</td>
                         <td>${b.location}</td>
                         <td>${b.status}</td>
-                        <td><button onclick="handleBorrowBook('${b.id}')">借书</button></td>
+                        <td><button onclick="handleBorrow('${b.id}')">借书</button></td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -49,14 +46,10 @@
             }
         }
 
-        // 重命名为 handleBorrowBook，调用 apiBorrowBook
-        async function handleBorrowBook(bookId) {
-            const readerId = getLoggedReader();
-            if (!readerId) {
-                alert('请先登录');
-                window.location.href = 'index.html';
-                return;
-            }
+        async function handleBorrow(bookId) {
+            const readerId = requireLogin();
+            if (!readerId) return;
+
             const days = prompt('借阅天数（默认30天）：', '30');
             if (days === null) return;
             const daysNum = parseInt(days) || 30;
@@ -64,18 +57,17 @@
                 alert('天数必须大于0');
                 return;
             }
-            console.log('handleBorrowBook called with:', { readerId, bookId, daysNum });
+
             try {
                 const data = await apiBorrowBook(readerId, bookId, daysNum);
                 if (data.status === 'ok') {
                     alert(`借书成功！应还日期：${data.due_date}`);
-                    loadBooks(); // 刷新列表
+                    loadBooks();
                 } else {
                     alert('借书失败：' + (data.error || '未知错误'));
                 }
             } catch (err) {
-                console.error('借书异常:', err);
-                alert('借书请求失败：' + (err.message || err));
+                alert('借书请求失败：' + err.message);
             }
         }
 

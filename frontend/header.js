@@ -1,4 +1,3 @@
-// 全局导航栏渲染
 function renderHeader() {
     const header = document.getElementById('app-header');
     if (!header) return;
@@ -34,14 +33,10 @@ function renderHeader() {
     header.innerHTML = navHtml;
 }
 
-// 登出函数
 function doLogout() {
     localStorage.removeItem('reader_id');
     localStorage.removeItem('reader_name');
     window.location.reload();
 }
 
-// 页面加载时自动渲染
-document.addEventListener('DOMContentLoaded', function() {
-    renderHeader();
-});
+document.addEventListener('DOMContentLoaded', renderHeader);

@@ -3,35 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <title>我的借书记录</title>
-    <!-- 使用内联 1x1 透明 GIF 作为 favicon，阻止浏览器请求外部 /favicon.ico -->
     <link rel="icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
-    <link rel="shortcut icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header id="app-header"></header>
-
     <div class="container">
         <h2>📋 我的借书记录</h2>
         <div id="login-info"></div>
         <table border="1">
-            <thead>
-                <tr><th>图书编号</th><th>借书日期</th><th>应还日期</th><th>归还日期</th><th>逾期天数</th></tr>
-            </thead>
+            <thead><tr><th>图书编号</th><th>借书日期</th><th>应还日期</th><th>归还日期</th><th>逾期天数</th></tr></thead>
             <tbody id="records-tbody"></tbody>
         </table>
     </div>
-
     <script src="script.js"></script>
     <script src="header.js"></script>
     <script>
         async function loadRecords() {
-            const rid = getLoggedReader();
-            if (!rid) {
-                alert('请先登录');
-                window.location.href = 'index.html';
-                return;
-            }
+            const rid = requireLogin();
+            if (!rid) return;
+
             try {
                 const data = await getMyRecords(rid);
                 const tbody = document.getElementById('records-tbody');

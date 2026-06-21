@@ -31,15 +31,22 @@
             btn.disabled = true;
             btn.textContent = '登录中...';
             try {
-                const readers = await getReaders();
-                const found = readers.find(r => r.id === id);
-                if (found) {
-                    setLoggedReader(id);
-                    // 同时存储用户名以便导航显示
-                    localStorage.setItem('reader_name', found.name);
-                    document.getElementById('login-status').textContent = `✅ 登录成功，欢迎 ${found.name}`;
-                    alert(`登录成功，欢迎 ${found.name}`);
-                    window.location.href = 'books.html';
+                const data = await loginCheck(id);
+                if (data.exists) {
+                    // 还需获取读者姓名（可从 /readers 单次查询，但为简单，此处用注册时存储）
+                    // 可改为在登录时调用 /readers 查找，但为了性能，仍使用 /readers 仅获取一次
+                    const readers = await getReaders();
+                    const found = readers.find(r => r.id === id);
+                    if (found) {
+                        setLoggedReader(id);
+                        localStorage.setItem('reader_name', found.name);
+                        alert(`登录成功，欢迎 ${found.name}`);
+                        window.location.href = 'books.html';
+                    } else {
+                        // 理论上不会发生
+                        alert('账户信息异常，请重新注册');
+                        window.location.href = 'register.html';
+                    }
                 } else {
                     alert('该学号未注册，请先注册');
                     window.location.href = 'register.html';
@@ -52,7 +59,6 @@
             }
         }
 
-        // 如果已登录，直接跳转至图书页
         window.onload = function() {
             if (getLoggedReader()) {
                 window.location.href = 'books.html';
