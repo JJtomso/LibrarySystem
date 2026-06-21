@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>我的借书记录</title>
+    <!-- 使用内联 1x1 透明 GIF 作为 favicon，阻止浏览器请求外部 /favicon.ico -->
+    <link rel="icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+    <link rel="shortcut icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="app-header"></header>
+
+    <div class="container">
+        <h2>📋 我的借书记录</h2>
+        <div id="login-info"></div>
+        <table border="1">
+            <thead>
+                <tr><th>图书编号</th><th>借书日期</th><th>应还日期</th><th>归还日期</th><th>逾期天数</th></tr>
+            </thead>
+            <tbody id="records-tbody"></tbody>
+        </table>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="header.js"></script>
+    <script>
+        async function loadRecords() {
+            const rid = getLoggedReader();
+            if (!rid) {
+                alert('请先登录');
+                window.location.href = 'index.html';
+                return;
+            }
+            try {
+                const data = await getMyRecords(rid);
+                const tbody = document.getElementById('records-tbody');
+                tbody.innerHTML = '';
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const overdue = r.overdue_days > 0 ? `<span style="color:red;">${r.overdue_days}天</span>` : '0';
+                    tr.innerHTML = `
+                        <td>${r.book_id}</td>
+                        <td>${r.borrow_date}</td>
+                        <td>${r.due_date}</td>
+                        <td>${r.return_date}</td>
+                        <td>${overdue}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                alert('加载记录失败：' + err.message);
+            }
+        }
+
+        window.onload = function() {
+            const rid = getLoggedReader();
+            document.getElementById('login-info').textContent = rid ? `当前登录：${rid}` : '未登录';
+            loadRecords();
+        };
+    </script>
+</body>
+</html>

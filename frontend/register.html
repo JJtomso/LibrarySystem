@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>读者注册</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="app-header"></header>
+
+    <div class="container">
+        <h2>👤 读者注册</h2>
+        <form id="reg-form">
+            <label>学号（9位）：<input type="text" id="reg-id" maxlength="9" required></label><br>
+            <label>姓名：<input type="text" id="reg-name" required></label><br>
+            <label>性别：
+                <select id="reg-gender">
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                </select>
+            </label><br>
+            <button type="button" id="reg-btn" onclick="doRegister()">注册</button>
+        </form>
+        <div id="reg-result"></div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="header.js"></script>
+    <script>
+        async function doRegister() {
+            const id = document.getElementById('reg-id').value.trim();
+            const name = document.getElementById('reg-name').value.trim();
+            const gender = document.getElementById('reg-gender').value;
+            if (!id || !name) {
+                alert('请填写完整');
+                return;
+            }
+            if (id.length !== 9) {
+                alert('学号必须为9位');
+                return;
+            }
+            const btn = document.getElementById('reg-btn');
+            btn.disabled = true;
+            btn.textContent = '注册中...';
+            try {
+                const data = await registerReader(id, name, gender);
+                if (data.status === 'ok') {
+                    setLoggedReader(id);
+                    localStorage.setItem('reader_name', name);
+                    document.getElementById('reg-result').textContent = '✅ 注册成功！';
+                    // 立即跳转
+                    window.location.href = 'books.html';
+                } else {
+                    if (data.code === 'ALREADY_EXISTS') {
+                        alert('该学号已注册，请直接登录');
+                        window.location.href = 'index.html';
+                    } else {
+                        document.getElementById('reg-result').textContent = '❌ 注册失败：' + (data.error || '未知错误');
+                        btn.disabled = false;
+                        btn.textContent = '注册';
+                    }
+                }
+            } catch (err) {
+                document.getElementById('reg-result').textContent = '❌ 注册请求失败：' + err.message;
+                btn.disabled = false;
+                btn.textContent = '注册';
+            }
+        }
+    </script>
+</body>
+</html>

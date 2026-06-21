@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理员</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="app-header"></header>
+
+    <div class="container">
+        <h2>⚙️ 管理员功能</h2>
+
+        <h3>📥 录入新图书</h3>
+        <form id="add-book-form">
+            编号：<input type="text" id="ab-id"><br>
+            书名：<input type="text" id="ab-name"><br>
+            作者：<input type="text" id="ab-author"><br>
+            出版社：<input type="text" id="ab-publisher"><br>
+            单价：<input type="number" step="0.01" id="ab-price"><br>
+            存放地点：<input type="text" id="ab-location"><br>
+            <!-- 修改按钮 onclick 指向新函数名 -->
+            <button type="button" id="ab-btn" onclick="addBookHandler()">录入</button>
+        </form>
+        <hr>
+
+        <h3>🗑️ 删除图书（按编号）</h3>
+        <input type="text" id="del-book-id" placeholder="图书编号">
+        <button id="del-btn" onclick="deleteBook()">删除</button>
+        <hr>
+
+        <!-- 新增：调整馆藏数量 -->
+        <h3>📦 调整馆藏数量</h3>
+        <form id="update-qty-form">
+            图书编号：<input type="text" id="uq-book-id" placeholder="例如 TP312C" required><br>
+            调整数量：<input type="number" id="uq-delta" placeholder="正数增加，负数减少" step="1" required><br>
+            <button type="button" id="uq-btn" onclick="updateQuantityHandler()">调整</button>
+        </form>
+        <div id="uq-result" style="margin-top:8px;"></div>
+        <hr>
+
+        <h3>⚠️ 所有逾期记录</h3>
+        <table border="1">
+            <thead>
+                <tr><th>学号</th><th>姓名</th><th>图书编号</th><th>借书日期</th><th>应还日期</th><th>逾期天数</th></tr>
+            </thead>
+            <tbody id="overdue-tbody"></tbody>
+        </table>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="header.js"></script>
+    <script>
+        // 原 addBook 函数重命名为 addBookHandler，避免与 script.js 中的 addBook 冲突
+        async function addBookHandler() {
+            const id = document.getElementById('ab-id').value.trim();
+            const name = document.getElementById('ab-name').value.trim();
+            const author = document.getElementById('ab-author').value.trim();
+            const publisher = document.getElementById('ab-publisher').value.trim();
+            const price = parseFloat(document.getElementById('ab-price').value) || 0;
+            const location = document.getElementById('ab-location').value.trim();
+            if (!id || !name) {
+                alert('编号和书名必填');
+                return;
+            }
+            const btn = document.getElementById('ab-btn');
+            btn.disabled = true;
+            btn.textContent = '录入中...';
+            try {
+                // 此处调用 script.js 中的 addBook（未被覆盖）
+                const data = await addBook({ id, name, author, publisher, price, location });
+                if (data.status === 'ok') {
+                    alert('录入成功');
+                    document.getElementById('ab-id').value = '';
+                    document.getElementById('ab-name').value = '';
+                    document.getElementById('ab-author').value = '';
+                    document.getElementById('ab-publisher').value = '';
+                    document.getElementById('ab-price').value = '';
+                    document.getElementById('ab-location').value = '';
+                } else {
+                    alert('录入失败：' + (data.error || '未知错误'));
+                }
+            } catch (err) {
+                alert('请求失败：' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '录入';
+            }
+        }
+
+        async function deleteBook() {
+            const id = document.getElementById('del-book-id').value.trim();
+            if (!id) {
+                alert('请输入图书编号');
+                return;
+            }
+            if (!confirm(`确定删除编号为 "${id}" 的图书吗？`)) return;
+            const btn = document.getElementById('del-btn');
+            btn.disabled = true;
+            btn.textContent = '删除中...';
+            try {
+                const data = await removeBook(id);
+                if (data.status === 'ok') {
+                    alert('删除成功');
+                    document.getElementById('del-book-id').value = '';
+                } else {
+                    alert('删除失败：' + (data.error || '未知错误'));
+                }
+            } catch (err) {
+                alert('请求失败：' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '删除';
+            }
+        }
+
+        // 新增：调整馆藏数量处理函数
+        async function updateQuantityHandler() {
+            const bookId = document.getElementById('uq-book-id').value.trim();
+            const deltaStr = document.getElementById('uq-delta').value.trim();
+            if (!bookId || deltaStr === '') {
+                alert('请完整填写编号和调整数量');
+                return;
+            }
+            const delta = parseInt(deltaStr, 10);
+            if (isNaN(delta) || delta === 0) {
+                alert('调整数量必须为非零整数');
+                return;
+            }
+            const btn = document.getElementById('uq-btn');
+            const resultDiv = document.getElementById('uq-result');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+            resultDiv.textContent = '';
+            try {
+                const data = await updateBookQuantity(bookId, delta);
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = `✅ 调整成功，新馆藏数量：<strong>${data.new_quantity}</strong>`;
+                    document.getElementById('uq-book-id').value = '';
+                    document.getElementById('uq-delta').value = '';
+                } else {
+                    resultDiv.textContent = '❌ 调整失败：' + (data.error || '未知错误');
+                }
+            } catch (err) {
+                resultDiv.textContent = '❌ 请求失败：' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '调整';
+            }
+        }
+
+        async function loadOverdue() {
+            try {
+                const data = await getOverdueRecords();
+                const tbody = document.getElementById('overdue-tbody');
+                tbody.innerHTML = '';
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${r.reader_id}</td>
+                        <td>${r.reader_name}</td>
+                        <td>${r.book_id}</td>
+                        <td>${r.borrow_date}</td>
+                        <td>${r.due_date}</td>
+                        <td style="color:red;">${r.overdue_days}天</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                alert('加载逾期记录失败：' + err.message);
+            }
+        }
+
+        window.onload = function() {
+            loadOverdue();
+        };
+    </script>
+</body>
+</html>

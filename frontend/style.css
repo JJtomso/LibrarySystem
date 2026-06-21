@@ -1,36 +1,143 @@
+/* 重置 */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f7fa;
+    padding-top: 70px; /* 为固定导航留空间 */
     margin: 0;
 }
 
-h1 {
-    text-align: center;
-    color: #333;
-}
-
-.container {
+/* 导航栏 */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: #2c3e50;
+    color: white;
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+.nav-left, .nav-right {
+    display: flex;
+    align-items: center;
     gap: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
 }
 
-.card {
-    background: white;
+.brand {
+    font-size: 22px;
+    font-weight: bold;
+    color: #ecf0f1;
+    text-decoration: none;
+    margin-right: 20px;
+}
+
+.brand:hover {
+    color: #ffffff;
+}
+
+.nav-link {
+    color: #bdc3c7;
+    text-decoration: none;
+    font-size: 16px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.nav-link:hover {
+    background: #34495e;
+    color: white;
+}
+
+.nav-right {
+    gap: 15px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.avatar {
+    font-size: 24px;
+}
+
+.username {
+    font-weight: bold;
+    color: #ecf0f1;
+}
+
+.logout-btn, .login-link, .register-link {
+    background: transparent;
+    border: 1px solid #bdc3c7;
+    color: #bdc3c7;
+    padding: 5px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover, .login-link:hover, .register-link:hover {
+    background: #ecf0f1;
+    color: #2c3e50;
+    border-color: #ecf0f1;
+}
+
+.login-link, .register-link {
+    border-color: #3498db;
+    color: #3498db;
+}
+
+.login-link:hover, .register-link:hover {
+    background: #3498db;
+    color: white;
+}
+
+/* 页面内容容器 */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 20px;
+    background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    width: 400px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
-.card h2 {
-    margin-top: 0;
-    color: #555;
+/* 表格样式保留原有 */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    background: white;
+    margin: 15px 0;
 }
 
-input, button {
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+/* 表单样式 */
+input, select, button {
     margin: 5px 0;
     padding: 8px 12px;
     border: 1px solid #ccc;
@@ -39,31 +146,23 @@ input, button {
 }
 
 button {
-    background-color: #007bff;
+    background-color: #3498db;
     color: white;
     border: none;
     cursor: pointer;
+    border-radius: 20px;
+    padding: 8px 20px;
 }
 
 button:hover {
-    background-color: #0056b3;
+    background-color: #2980b9;
 }
 
-.result-box {
-    margin-top: 15px;
-    padding: 12px;
-    background: #e9ecef;
-    border-radius: 4px;
-    font-family: monospace;
-    min-height: 30px;
-}
-
-ul {
-    list-style: none;
-    padding: 0;
-}
-
-li {
-    padding: 4px 0;
-    border-bottom: 1px solid #eee;
+/* 登录页面特殊（居中） */
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh;
+    padding-top: 0;
 }

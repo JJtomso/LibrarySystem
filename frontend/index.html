@@ -2,41 +2,62 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>图书馆并发管理系统</title>
+    <title>登录 - 图书馆系统</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>📚 图书馆并发管理系统 (OS Course Design)</h1>
-    
-    <div class="container">
-        <!-- 并发控制演示区 -->
-        <div class="card">
-            <h2>⚙️ 并发借书模拟 (读者-写者问题)</h2>
-            <p>模拟多个读者同时借阅同一本热门书籍，观察互斥锁的保护效果。</p>
-            <button onclick="simulateConcurrentBorrow()">开始并发借书测试</button>
-            <div id="concurrent-result" class="result-box">等待测试...</div>
-        </div>
-
-        <!-- 读者管理区 -->
-        <div class="card">
-            <h2>👤 读者管理</h2>
-            <input type="text" id="reader-name" placeholder="姓名">
-            <input type="text" id="reader-id" placeholder="学号">
-            <button onclick="addReader()">办理注册</button>
-            <ul id="reader-list"></ul>
-        </div>
-
-        <!-- 图书管理区 -->
-        <div class="card">
-            <h2>📖 图书管理</h2>
-            <input type="text" id="book-name" placeholder="书名">
-            <input type="text" id="book-id" placeholder="编号">
-            <button onclick="addBook()">录入新书</button>
-            <button onclick="deleteBook()">撤销图书</button>
-            <ul id="book-list"></ul>
+    <div class="container login-page">
+        <div style="text-align:center; width:400px;">
+            <h1>📚 图书馆系统</h1>
+            <h2>登录</h2>
+            <input type="text" id="login-id" placeholder="9位学号" maxlength="9" style="width:100%;">
+            <br>
+            <button id="login-btn" onclick="doLogin()" style="width:100%; margin-top:10px;">登录</button>
+            <div id="login-status" style="margin-top:10px;"></div>
+            <p style="margin-top:20px;">
+                <a href="register.html">注册新账号</a>
+            </p>
         </div>
     </div>
-
     <script src="script.js"></script>
+    <script>
+        async function doLogin() {
+            const id = document.getElementById('login-id').value.trim();
+            if (id.length !== 9) {
+                alert('学号必须为9位');
+                return;
+            }
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+            try {
+                const readers = await getReaders();
+                const found = readers.find(r => r.id === id);
+                if (found) {
+                    setLoggedReader(id);
+                    // 同时存储用户名以便导航显示
+                    localStorage.setItem('reader_name', found.name);
+                    document.getElementById('login-status').textContent = `✅ 登录成功，欢迎 ${found.name}`;
+                    alert(`登录成功，欢迎 ${found.name}`);
+                    window.location.href = 'books.html';
+                } else {
+                    alert('该学号未注册，请先注册');
+                    window.location.href = 'register.html';
+                }
+            } catch (err) {
+                alert('登录请求失败：' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        }
+
+        // 如果已登录，直接跳转至图书页
+        window.onload = function() {
+            if (getLoggedReader()) {
+                window.location.href = 'books.html';
+            }
+        };
+    </script>
 </body>
 </html>
