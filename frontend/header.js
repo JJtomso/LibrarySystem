@@ -2,22 +2,40 @@ function renderHeader() {
     const header = document.getElementById('app-header');
     if (!header) return;
 
-    const readerId = localStorage.getItem('reader_id') || null;
+    const username = getUsername();
+    const role = getRole();
     let userName = '游客';
-    if (readerId) {
-        userName = localStorage.getItem('reader_name') || readerId;
+    if (username) {
+        userName = getUserName();
+    }
+
+    // 根据角色生成导航链接
+    let navLinks = '';
+    if (role === 'student') {
+        navLinks = `
+            <a href="books.html" class="nav-link">图书浏览</a>
+            <a href="myrecords.html" class="nav-link">我的借阅</a>
+        `;
+    } else if (role === 'admin') {
+        navLinks = `
+            <a href="books.html" class="nav-link">图书浏览</a>
+            <a href="admin.html" class="nav-link">管理员</a>
+        `;
+    } else {
+        // 未登录
+        navLinks = `
+            <a href="books.html" class="nav-link">图书浏览</a>
+        `;
     }
 
     const navHtml = `
         <div class="navbar">
             <div class="nav-left">
                 <a href="books.html" class="brand">📚 图书馆系统</a>
-                <a href="books.html" class="nav-link">图书浏览</a>
-                <a href="myrecords.html" class="nav-link">我的借阅</a>
-                <a href="admin.html" class="nav-link">管理员</a>
+                ${navLinks}
             </div>
             <div class="nav-right">
-                ${readerId ? `
+                ${username ? `
                     <span class="user-info">
                         <span class="avatar">👤</span>
                         <span class="username">${userName}</span>
@@ -34,8 +52,10 @@ function renderHeader() {
 }
 
 function doLogout() {
+    localStorage.removeItem('username');
+    localStorage.removeItem('role');
+    localStorage.removeItem('name');
     localStorage.removeItem('reader_id');
-    localStorage.removeItem('reader_name');
     window.location.reload();
 }
 

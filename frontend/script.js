@@ -1,29 +1,83 @@
 const API = 'http://localhost:8888';
 
-// ---------- 登录状态管理 ----------
+// ---------- 用户信息管理（角色、用户名） ----------
+function setUserInfo(username, role, name) {
+    localStorage.setItem('username', username);
+    localStorage.setItem('role', role);
+    localStorage.setItem('name', name);
+    if (role === 'student') {
+        localStorage.setItem('reader_id', username); // 兼容旧逻辑
+    } else {
+        localStorage.removeItem('reader_id');
+    }
+}
+
+function getUsername() {
+    return localStorage.getItem('username') || null;
+}
+
+function getRole() {
+    return localStorage.getItem('role') || null;
+}
+
+function isLoggedIn() {
+    return getUsername() !== null;
+}
+
+function getUserName() {
+    return localStorage.getItem('name') || getUsername() || '用户';
+}
+
+// 兼容旧代码：获取读者学号（仅学生）
 function getLoggedReader() {
-    return localStorage.getItem('reader_id') || null;
+    if (getRole() === 'student') return getUsername();
+    return null;
 }
 
 function setLoggedReader(id) {
-    localStorage.setItem('reader_id', id);
+    // 已被 setUserInfo 替代，保留空函数防错
 }
 
 function logout() {
+    localStorage.removeItem('username');
+    localStorage.removeItem('role');
+    localStorage.removeItem('name');
     localStorage.removeItem('reader_id');
-    localStorage.removeItem('reader_name');
     window.location.href = 'index.html';
 }
 
 // ---------- 公共工具 ----------
 function requireLogin() {
-    const id = getLoggedReader();
-    if (!id) {
+    if (!isLoggedIn()) {
         alert('请先登录');
         window.location.href = 'index.html';
         return null;
     }
-    return id;
+    return getUsername();
+}
+
+// 限制学生访问
+function requireStudent() {
+    const username = requireLogin();
+    if (!username) return null;
+    if (getRole() !== 'student') {
+        alert('该功能仅限学生使用');
+        window.history.back();
+        return null;
+    }
+    return username;
+}
+
+// 限制管理员访问
+function requireAdmin() {
+    const username = requireLogin();
+    if (!username) return null;
+    if (getRole() !== 'admin') {
+        alert('该功能仅限管理员使用');
+        window.history.back();
+        return null;
+    }
+    return username;
 }
 
 // ---------- API 封装 ----------
@@ -59,8 +113,18 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 // ---------- API 方法 ----------
-async function loginCheck(readerId) {
-    return await apiFetch(`/login?reader_id=${readerId}`);
+async function login(username, password) {
+    return await apiFetch('/login', {
+        method: 'POST',
+        body: { username, password }
+    });
+}
+
+async function changePassword(username, oldPassword, newPassword) {
+    return await apiFetch('/change-password', {
+        method: 'POST',
+        body: { username, old_password: oldPassword, new_password: newPassword }
+    });
 }
 
 async function getReaders() {

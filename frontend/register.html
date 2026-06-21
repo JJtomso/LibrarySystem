@@ -45,11 +45,8 @@
             try {
                 const data = await registerReader(id, name, gender);
                 if (data.status === 'ok') {
-                    setLoggedReader(id);
-                    localStorage.setItem('reader_name', name);
-                    document.getElementById('reg-result').textContent = '✅ 注册成功！';
-                    // 立即跳转
-                    window.location.href = 'books.html';
+                    alert('注册成功！请使用学号和默认密码 123456 登录。');
+                    window.location.href = 'index.html';
                 } else {
                     if (data.code === 'ALREADY_EXISTS') {
                         alert('该学号已注册，请直接登录');

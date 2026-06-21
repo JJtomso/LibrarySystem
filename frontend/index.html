@@ -10,46 +10,45 @@
         <div style="text-align:center; width:400px;">
             <h1>📚 图书馆系统</h1>
             <h2>登录</h2>
-            <input type="text" id="login-id" placeholder="9位学号" maxlength="9" style="width:100%;">
+            <input type="text" id="login-username" placeholder="学号或admin" style="width:100%;">
+            <br>
+            <input type="password" id="login-password" placeholder="密码" style="width:100%; margin-top:5px;">
             <br>
             <button id="login-btn" onclick="doLogin()" style="width:100%; margin-top:10px;">登录</button>
             <div id="login-status" style="margin-top:10px;"></div>
             <p style="margin-top:20px;">
                 <a href="register.html">注册新账号</a>
             </p>
+            <p style="font-size:12px; color:#888; margin-top:10px;">
+                学生默认密码：123456<br>
+                管理员：admin / Admin@123
+            </p>
         </div>
     </div>
     <script src="script.js"></script>
     <script>
         async function doLogin() {
-            const id = document.getElementById('login-id').value.trim();
-            if (id.length !== 9) {
-                alert('学号必须为9位');
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            if (!username || !password) {
+                alert('请填写完整');
                 return;
             }
             const btn = document.getElementById('login-btn');
             btn.disabled = true;
             btn.textContent = '登录中...';
             try {
-                const data = await loginCheck(id);
-                if (data.exists) {
-                    // 还需获取读者姓名（可从 /readers 单次查询，但为简单，此处用注册时存储）
-                    // 可改为在登录时调用 /readers 查找，但为了性能，仍使用 /readers 仅获取一次
-                    const readers = await getReaders();
-                    const found = readers.find(r => r.id === id);
-                    if (found) {
-                        setLoggedReader(id);
-                        localStorage.setItem('reader_name', found.name);
-                        alert(`登录成功，欢迎 ${found.name}`);
-                        window.location.href = 'books.html';
+                const data = await login(username, password);
+                if (data.status === 'ok') {
+                    setUserInfo(username, data.role, data.name);
+                    if (data.role === 'student' && data.need_change === 1) {
+                        // 强制修改密码
+                        window.location.href = 'change-password.html?force=true';
                     } else {
-                        // 理论上不会发生
-                        alert('账户信息异常，请重新注册');
-                        window.location.href = 'register.html';
+                        window.location.href = 'books.html';
                     }
                 } else {
-                    alert('该学号未注册，请先注册');
-                    window.location.href = 'register.html';
+                    alert('登录失败：' + (data.error || '未知错误'));
                 }
             } catch (err) {
                 alert('登录请求失败：' + err.message);
@@ -60,7 +59,7 @@
         }
 
         window.onload = function() {
-            if (getLoggedReader()) {
+            if (isLoggedIn()) {
                 window.location.href = 'books.html';
             }
         };

@@ -118,7 +118,7 @@ body {
     box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
-/* 表格样式保留原有 */
+/* 表格样式 */
 table {
     border-collapse: collapse;
     width: 100%;
@@ -158,6 +158,11 @@ button:hover {
     background-color: #2980b9;
 }
 
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* 登录页面特殊（居中） */
 .login-page {
     display: flex;
@@ -165,4 +170,9 @@ button:hover {
     align-items: center;
     height: 80vh;
     padding-top: 0;
+}
+
+/* 管理员页面表单内联调整 */
+#admin-container input, #admin-container button {
+    margin: 4px 0;
 }

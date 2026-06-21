@@ -29,6 +29,16 @@
                 tbody.innerHTML = '';
                 data.forEach(b => {
                     const tr = document.createElement('tr');
+                    // 操作列根据角色显示
+                    let actionHtml = '';
+                    const role = getRole();
+                    if (role === 'student') {
+                        actionHtml = `<button onclick="handleBorrow('${b.id}')">借书</button>`;
+                    } else if (role === 'admin') {
+                        actionHtml = `<span style="color:gray;">管理员不可借</span>`;
+                    } else {
+                        actionHtml = `<a href="index.html">登录借书</a>`;
+                    }
                     tr.innerHTML = `
                         <td>${b.id}</td>
                         <td>${b.name}</td>
@@ -37,7 +47,7 @@
                         <td>${b.price.toFixed(2)}</td>
                         <td>${b.location}</td>
                         <td>${b.status}</td>
-                        <td><button onclick="handleBorrow('${b.id}')">借书</button></td>
+                        <td>${actionHtml}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -47,8 +57,13 @@
         }
 
         async function handleBorrow(bookId) {
-            const readerId = requireLogin();
-            if (!readerId) return;
+            // 检查是否登录且为学生
+            const username = requireLogin();
+            if (!username) return;
+            if (getRole() !== 'student') {
+                alert('只有学生可以借书');
+                return;
+            }
 
             const days = prompt('借阅天数（默认30天）：', '30');
             if (days === null) return;
@@ -59,7 +74,7 @@
             }
 
             try {
-                const data = await apiBorrowBook(readerId, bookId, daysNum);
+                const data = await apiBorrowBook(username, bookId, daysNum);
                 if (data.status === 'ok') {
                     alert(`借书成功！应还日期：${data.due_date}`);
                     loadBooks();
@@ -72,8 +87,13 @@
         }
 
         window.onload = function() {
-            const rid = getLoggedReader();
-            document.getElementById('login-info').textContent = rid ? `当前登录：${rid}` : '未登录';
+            const username = getUsername();
+            const role = getRole();
+            let info = '未登录';
+            if (username) {
+                info = `当前登录：${username} (${role === 'student' ? '学生' : '管理员'})`;
+            }
+            document.getElementById('login-info').textContent = info;
             loadBooks();
         };
     </script>

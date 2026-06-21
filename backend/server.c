@@ -2,9 +2,10 @@
  * 图书馆管理系统 - 后端服务
  * 基于 libmicrohttpd，提供 RESTful API
  * 数据持久化至二进制文件 library.dat
+ * 支持管理员/学生独立登录，密码保护，强制修改密码
  */
 
-#define _XOPEN_SOURCE 700  // 启用 strptime 等 POSIX 函数
+#define _XOPEN_SOURCE 700
 
 #include <microhttpd.h>
 #include <pthread.h>
@@ -29,6 +30,8 @@ typedef struct {
     char id[10];
     char name[50];
     char gender[4];
+    char password[64];      // 存储密码
+    int need_change;        // 1=需要修改密码
 } Reader;
 
 typedef struct {
@@ -50,6 +53,11 @@ typedef struct {
     char return_date[DATE_STR_LEN];
 } BorrowRecord;
 
+typedef struct {
+    char username[20];
+    char password[64];
+} Admin;
+
 /* ==================== 请求缓冲区 ==================== */
 typedef struct {
     char buf[BUFFER_SIZE];
@@ -69,6 +77,7 @@ static Book books[MAX_BOOKS];
 static int book_count = 0;
 static BorrowRecord records[MAX_RECORDS];
 static int record_count = 0;
+static Admin admin = {"admin", "Admin@123"};
 static pthread_mutex_t data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* ==================== 日志 ==================== */
@@ -98,6 +107,8 @@ void save_data(void) {
     if (reader_count > 0) fwrite(readers, sizeof(Reader), reader_count, fp);
     if (book_count > 0) fwrite(books, sizeof(Book), book_count, fp);
     if (record_count > 0) fwrite(records, sizeof(BorrowRecord), record_count, fp);
+    // 保存管理员信息（密码可能已修改）
+    fwrite(&admin, sizeof(Admin), 1, fp);
     fflush(fp); fsync(fileno(fp)); fclose(fp);
     LOG_INFO("数据已保存 (读者:%d, 图书:%d, 记录:%d)", reader_count, book_count, record_count);
 }
@@ -108,6 +119,9 @@ void load_data(void) {
         reader_count = 0;
         book_count = 0;
         record_count = 0;
+        // 使用默认管理员
+        strcpy(admin.username, "admin");
+        strcpy(admin.password, "Admin@123");
         LOG_INFO("数据文件不存在，初始化空数据");
         return; 
     }
@@ -120,6 +134,12 @@ void load_data(void) {
         fread(books, sizeof(Book), book_count, fp);
     if (record_count > 0 && record_count <= MAX_RECORDS)
         fread(records, sizeof(BorrowRecord), record_count, fp);
+    // 读取管理员信息（兼容旧文件）
+    if (fread(&admin, sizeof(Admin), 1, fp) != 1) {
+        // 旧文件没有管理员信息，使用默认
+        strcpy(admin.username, "admin");
+        strcpy(admin.password, "Admin@123");
+    }
     fclose(fp);
     LOG_INFO("加载数据成功 (读者:%d, 图书:%d, 记录:%d)", reader_count, book_count, record_count);
 }
@@ -131,6 +151,8 @@ void init_sample_data(void) {
     strcpy(readers[0].id, "202100101");
     strcpy(readers[0].name, "张三");
     strcpy(readers[0].gender, "男");
+    strcpy(readers[0].password, "123456");
+    readers[0].need_change = 1;
     reader_count = 1;
 
     strcpy(books[0].book_id, "TP312C");
@@ -149,6 +171,7 @@ void init_sample_data(void) {
     records[0].return_date[0] = '\0';
     record_count = 1;
 
+    // 管理员已默认
     save_data();
     LOG_INFO("初始化样例数据完成");
 }
@@ -216,6 +239,12 @@ static double json_extract_double(const char *json, const char *key) {
     return atof(buf);
 }
 
+static int json_extract_int(const char *json, const char *key) {
+    char buf[32];
+    json_extract_string(json, key, buf, sizeof(buf));
+    return atoi(buf);
+}
+
 /* ==================== HTTP 响应辅助 ==================== */
 static enum MHD_Result send_json(struct MHD_Connection *conn, int status, const char *json) {
     struct MHD_Response *resp = MHD_create_response_from_buffer(
@@ -251,6 +280,8 @@ static int register_reader_internal(const char *id, const char *name, const char
     strncpy(readers[reader_count].id, id, sizeof(readers[0].id) - 1);
     strncpy(readers[reader_count].name, name, sizeof(readers[0].name) - 1);
     strncpy(readers[reader_count].gender, gender, sizeof(readers[0].gender) - 1);
+    strcpy(readers[reader_count].password, "123456");
+    readers[reader_count].need_change = 1;
     reader_count++;
     return 0;
 }
@@ -611,25 +642,87 @@ static enum MHD_Result handle_overdue(struct MHD_Connection *conn) {
     return send_json(conn, MHD_HTTP_OK, tmp);
 }
 
-/* GET /login */
-static enum MHD_Result handle_login(struct MHD_Connection *conn) {
-    ParamContext ctx = { .id = {0}, .found = 0 };
-    MHD_get_connection_values(conn, MHD_GET_ARGUMENT_KIND, param_callback, &ctx);
-    
-    if (!ctx.found || !ctx.id[0]) {
-        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"missing reader_id\"}");
+/* POST /login - 支持管理员和学生登录 */
+static enum MHD_Result handle_login(struct MHD_Connection *conn, const char *body) {
+    if (!body || !*body) {
+        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"Empty body\"}");
     }
-    
+    char username[32] = {0}, password[64] = {0};
+    json_extract_string(body, "username", username, sizeof(username));
+    json_extract_string(body, "password", password, sizeof(password));
+    if (!username[0] || !password[0]) {
+        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"Missing username/password\"}");
+    }
+    // 检查管理员
+    if (strcmp(username, admin.username) == 0) {
+        if (strcmp(password, admin.password) == 0) {
+            return send_json(conn, MHD_HTTP_OK,
+                "{\"status\":\"ok\",\"role\":\"admin\",\"need_change\":0,\"name\":\"管理员\"}");
+        } else {
+            return send_json(conn, MHD_HTTP_UNAUTHORIZED, "{\"error\":\"Wrong password\"}");
+        }
+    }
+    // 检查读者
     pthread_mutex_lock(&data_mutex);
-    int exists = 0;
     for (int i = 0; i < reader_count; i++) {
-        if (strcmp(readers[i].id, ctx.id) == 0) { exists = 1; break; }
+        if (strcmp(readers[i].id, username) == 0) {
+            if (strcmp(readers[i].password, password) == 0) {
+                char resp[256];
+                snprintf(resp, sizeof(resp),
+                    "{\"status\":\"ok\",\"role\":\"student\",\"need_change\":%d,\"name\":\"%s\"}",
+                    readers[i].need_change, readers[i].name);
+                pthread_mutex_unlock(&data_mutex);
+                return send_json(conn, MHD_HTTP_OK, resp);
+            } else {
+                pthread_mutex_unlock(&data_mutex);
+                return send_json(conn, MHD_HTTP_UNAUTHORIZED, "{\"error\":\"Wrong password\"}");
+            }
+        }
     }
     pthread_mutex_unlock(&data_mutex);
-    
-    char resp[64];
-    snprintf(resp, sizeof(resp), "{\"exists\":%s}", exists ? "true" : "false");
-    return send_json(conn, MHD_HTTP_OK, resp);
+    return send_json(conn, MHD_HTTP_NOT_FOUND, "{\"error\":\"User not found\"}");
+}
+
+/* POST /change-password */
+static enum MHD_Result handle_change_password(struct MHD_Connection *conn, const char *body) {
+    if (!body || !*body) {
+        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"Empty body\"}");
+    }
+    char username[32] = {0}, old_pwd[64] = {0}, new_pwd[64] = {0};
+    json_extract_string(body, "username", username, sizeof(username));
+    json_extract_string(body, "old_password", old_pwd, sizeof(old_pwd));
+    json_extract_string(body, "new_password", new_pwd, sizeof(new_pwd));
+    if (!username[0] || !old_pwd[0] || !new_pwd[0]) {
+        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"Missing fields\"}");
+    }
+    if (strlen(new_pwd) < 6) {
+        return send_json(conn, MHD_HTTP_BAD_REQUEST, "{\"error\":\"Password too short (min 6)\"}");
+    }
+    // 管理员改密
+    if (strcmp(username, admin.username) == 0) {
+        if (strcmp(old_pwd, admin.password) != 0)
+            return send_json(conn, MHD_HTTP_UNAUTHORIZED, "{\"error\":\"Wrong old password\"}");
+        strncpy(admin.password, new_pwd, sizeof(admin.password)-1);
+        save_data();
+        return send_json(conn, MHD_HTTP_OK, "{\"status\":\"ok\"}");
+    }
+    // 读者改密
+    pthread_mutex_lock(&data_mutex);
+    for (int i = 0; i < reader_count; i++) {
+        if (strcmp(readers[i].id, username) == 0) {
+            if (strcmp(readers[i].password, old_pwd) != 0) {
+                pthread_mutex_unlock(&data_mutex);
+                return send_json(conn, MHD_HTTP_UNAUTHORIZED, "{\"error\":\"Wrong old password\"}");
+            }
+            strncpy(readers[i].password, new_pwd, sizeof(readers[i].password)-1);
+            readers[i].need_change = 0;  // 清除强制标志
+            save_data();
+            pthread_mutex_unlock(&data_mutex);
+            return send_json(conn, MHD_HTTP_OK, "{\"status\":\"ok\"}");
+        }
+    }
+    pthread_mutex_unlock(&data_mutex);
+    return send_json(conn, MHD_HTTP_NOT_FOUND, "{\"error\":\"User not found\"}");
 }
 
 /* POST /update-quantity */
@@ -721,8 +814,6 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
             ret = send_json(conn, MHD_HTTP_OK, "{\"status\":\"running\"}");
         } else if (strcmp(url, "/readers") == 0) {
             ret = handle_get_readers(conn);
-        } else if (strcmp(url, "/login") == 0) {
-            ret = handle_login(conn);
         } else if (strcmp(url, "/books") == 0) {
             ret = handle_get_books(conn);
         } else if (strncmp(url, "/myrecords", 10) == 0) {
@@ -741,6 +832,10 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
             ret = handle_borrow(conn, body);
         } else if (strcmp(url, "/update-quantity") == 0) {
             ret = handle_update_quantity(conn, body);
+        } else if (strcmp(url, "/login") == 0) {
+            ret = handle_login(conn, body);
+        } else if (strcmp(url, "/change-password") == 0) {
+            ret = handle_change_password(conn, body);
         } else {
             ret = send_json(conn, MHD_HTTP_NOT_FOUND, "{\"error\":\"Not Found\"}");
         }

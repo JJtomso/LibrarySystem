@@ -7,7 +7,7 @@
 </head>
 <body>
     <header id="app-header"></header>
-    <div class="container">
+    <div class="container" id="admin-container">
         <h2>⚙️ 管理员功能</h2>
         <h3>📥 录入新图书</h3>
         <form id="add-book-form">
@@ -37,10 +37,50 @@
             <thead><tr><th>学号</th><th>姓名</th><th>图书编号</th><th>借书日期</th><th>应还日期</th><th>逾期天数</th></tr></thead>
             <tbody id="overdue-tbody"></tbody>
         </table>
+        <hr>
+        <h3>🔑 修改管理员密码</h3>
+        <form id="change-admin-pwd">
+            旧密码：<input type="password" id="admin-old-pwd"><br>
+            新密码：<input type="password" id="admin-new-pwd"><br>
+            <button type="button" onclick="changeAdminPassword()">修改</button>
+        </form>
+        <div id="admin-pwd-result"></div>
     </div>
     <script src="script.js"></script>
     <script src="header.js"></script>
     <script>
+        // 页面加载时检查管理员权限
+        window.onload = function() {
+            const admin = requireAdmin();
+            if (!admin) {
+                document.getElementById('admin-container').innerHTML = '<h2>权限不足</h2><p>该页面仅管理员可访问</p>';
+                return;
+            }
+            loadOverdue();
+        };
+
+        async function loadOverdue() {
+            try {
+                const data = await getOverdueRecords();
+                const tbody = document.getElementById('overdue-tbody');
+                tbody.innerHTML = '';
+                data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${r.reader_id}</td>
+                        <td>${r.reader_name}</td>
+                        <td>${r.book_id}</td>
+                        <td>${r.borrow_date}</td>
+                        <td>${r.due_date}</td>
+                        <td style="color:red;">${r.overdue_days}天</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                alert('加载逾期记录失败：' + err.message);
+            }
+        }
+
         async function handleAddBook() {
             const book = {
                 id: document.getElementById('ab-id').value.trim(),
@@ -73,55 +113,46 @@
             }
         }
 
- async function handleDeleteBook() {
-    const id = document.getElementById('del-book-id').value.trim();
-    if (!id) {
-        alert('请输入图书编号');
-        return;
-    }
-    
-    // 先查询图书信息，显示确认对话框
-    try {
-        const books = await getBooks();
-        const book = books.find(b => b.id === id);
-        if (!book) {
-            alert('未找到该图书');
-            return;
+        async function handleDeleteBook() {
+            const id = document.getElementById('del-book-id').value.trim();
+            if (!id) {
+                alert('请输入图书编号');
+                return;
+            }
+            
+            try {
+                const books = await getBooks();
+                const book = books.find(b => b.id === id);
+                if (!book) {
+                    alert('未找到该图书');
+                    return;
+                }
+                const msg = `确定要删除图书 "${book.name}" 吗？\n` +
+                            `编号：${book.id}\n馆藏数量：${book.quantity} 册\n已借出：${book.borrowed} 册\n\n⚠️ 此操作将删除该图书的全部馆藏记录！`;
+                if (!confirm(msg)) return;
+            } catch (err) {
+                alert('查询图书信息失败：' + err.message);
+                return;
+            }
+            
+            const btn = document.getElementById('del-btn');
+            btn.disabled = true;
+            btn.textContent = '删除中...';
+            try {
+                const data = await apiRemoveBook(id);
+                if (data.status === 'ok') {
+                    alert(`✅ 删除成功！已删除 ${data.removed_quantity || ''} 册`);
+                    document.getElementById('del-book-id').value = '';
+                } else {
+                    alert('删除失败：' + (data.error || '未知错误'));
+                }
+            } catch (err) {
+                alert('请求失败：' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '删除';
+            }
         }
-        
-        const msg = `确定要删除图书 "${book.name}" 吗？\n` +
-                    `编号：${book.id}\n` +
-                    `馆藏数量：${book.quantity} 册\n` +
-                    `已借出：${book.borrowed} 册\n\n` +
-                    `⚠️ 此操作将删除该图书的全部馆藏记录！`;
-        
-        if (!confirm(msg)) return;
-    } catch (err) {
-        alert('查询图书信息失败：' + err.message);
-        return;
-    }
-    
-    const btn = document.getElementById('del-btn');
-    btn.disabled = true;
-    btn.textContent = '删除中...';
-    
-    try {
-        const data = await apiRemoveBook(id);
-        if (data.status === 'ok') {
-            alert(`✅ 删除成功！已删除 ${data.removed_quantity || ''} 册`);
-            document.getElementById('del-book-id').value = '';
-            // 刷新图书列表（如果在当前页面显示）
-            if (typeof loadBooks === 'function') loadBooks();
-        } else {
-            alert('删除失败：' + (data.error || '未知错误'));
-        }
-    } catch (err) {
-        alert('请求失败：' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '删除';
-    }
-}
 
         async function handleUpdateQuantity() {
             const bookId = document.getElementById('uq-book-id').value.trim();
@@ -152,29 +183,31 @@
             }
         }
 
-        async function loadOverdue() {
+        async function changeAdminPassword() {
+            const old = document.getElementById('admin-old-pwd').value.trim();
+            const newp = document.getElementById('admin-new-pwd').value.trim();
+            if (!old || !newp) {
+                alert('请填写完整');
+                return;
+            }
+            if (newp.length < 6) {
+                alert('新密码至少6位');
+                return;
+            }
+            const resultDiv = document.getElementById('admin-pwd-result');
             try {
-                const data = await getOverdueRecords();
-                const tbody = document.getElementById('overdue-tbody');
-                tbody.innerHTML = '';
-                data.forEach(r => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${r.reader_id}</td>
-                        <td>${r.reader_name}</td>
-                        <td>${r.book_id}</td>
-                        <td>${r.borrow_date}</td>
-                        <td>${r.due_date}</td>
-                        <td style="color:red;">${r.overdue_days}天</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                const data = await changePassword('admin', old, newp);
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = '✅ 管理员密码修改成功';
+                    document.getElementById('admin-old-pwd').value = '';
+                    document.getElementById('admin-new-pwd').value = '';
+                } else {
+                    resultDiv.innerHTML = '❌ ' + (data.error || '未知错误');
+                }
             } catch (err) {
-                alert('加载逾期记录失败：' + err.message);
+                resultDiv.innerHTML = '❌ 请求失败：' + err.message;
             }
         }
-
-        window.onload = loadOverdue;
     </script>
 </body>
 </html>
